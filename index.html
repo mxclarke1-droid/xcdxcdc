@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Santa Model Debug</title>
+
+    <style>
+        html, body {
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #111;
+        }
+
+        #info {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            z-index: 10;
+            background: rgba(0,0,0,.85);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            font-family: Arial;
+        }
+    </style>
+</head>
+
+<body>
+
+<div id="info">🎅 Loading Santa...</div>
+
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+
+<script>
+
+const scene = new THREE.Scene();
+
+scene.background = new THREE.Color(0x222222);
+
+
+// CAMERA
+
+const camera = new THREE.PerspectiveCamera(
+    50,
+    window.innerWidth / window.innerHeight,
+    0.001,
+    1000000
+);
+
+camera.position.set(0, 0, 10);
+
+
+// RENDERER
+
+const renderer = new THREE.WebGLRenderer({
+    antialias: true
+});
+
+renderer.setSize(
+    window.innerWidth,
+    window.innerHeight
+);
+
+renderer.setPixelRatio(
+    window.devicePixelRatio
+);
+
+renderer.outputEncoding = THREE.sRGBEncoding;
+
+document.body.appendChild(renderer.domElement);
+
+
+// LIGHTING
+
+scene.add(
+    new THREE.AmbientLight(
+        0xffffff,
+        3
+    )
+);
+
+const light1 = new THREE.DirectionalLight(
+    0xffffff,
+    5
+);
+
+light1.position.set(
+    10,
+    10,
+    10
+);
+
+scene.add(light1);
+
+const light2 = new THREE.DirectionalLight(
+    0xffffff,
+    5
+);
+
+light2.position.set(
+    -10,
+    5,
+    10
+);
+
+scene.add(light2);
+
+
+// CONTROLS
+
+const controls = new THREE.OrbitControls(
+    camera,
+    renderer.domElement
+);
+
+controls.enableDamping = true;
+
+
+// LOAD SANTA
+
+const loader = new THREE.GLTFLoader();
+
+loader.load(
+    "./santa.gltf",
+
+    function(gltf) {
+
+        const santa = gltf.scene;
+
+        scene.add(santa);
+
+        console.log("========== SANTA DEBUG ==========");
+        console.log("Scene:", santa);
+
+        let meshCount = 0;
+
+        santa.traverse(function(object) {
+
+            if (object.isMesh) {
+
+                meshCount++;
+
+                object.frustumCulled = false;
+
+                console.log(
+                    "MESH:",
+                    object.name,
+                    "position:",
+                    object.position,
+                    "scale:",
+                    object.scale
+                );
+
+            }
+
+        });
+
+        console.log(
+            "TOTAL MESHES:",
+            meshCount
+        );
+
+
+        // GET MODEL BOUNDING BOX
+
+        let box =
+            new THREE.Box3()
+                .setFromObject(santa);
+
+        console.log(
+            "ORIGINAL BOX:",
+            box
+        );
+
+
+        let size =
+            new THREE.Vector3();
+
+        box.getSize(size);
+
+        console.log(
+            "MODEL SIZE:",
+            size
+        );
+
+
+        let center =
+            new THREE.Vector3();
+
+        box.getCenter(center);
+
+        console.log(
+            "MODEL CENTER:",
+            center
+        );
+
+
+        // MOVE CENTER TO ORIGIN
+
+        santa.position.x -= center.x;
+        santa.position.y -= center.y;
+        santa.position.z -= center.z;
+
+
+        // FIND BIGGEST DIMENSION
+
+        const biggest =
+            Math.max(
+                size.x,
+                size.y,
+                size.z
+            );
+
+
+        console.log(
+            "BIGGEST SIZE:",
+            biggest
+        );
+
+
+        // AUTOMATIC SCALE
+
+        if (biggest > 0) {
+
+            const wantedSize = 5;
+
+            const scale =
+                wantedSize / biggest;
+
+            santa.scale.set(
+                scale,
+                scale,
+                scale
+            );
+
+            console.log(
+                "APPLIED SCALE:",
+                scale
+            );
+        }
+
+
+        // RECENTER AFTER SCALE
+
+        box =
+            new THREE.Box3()
+                .setFromObject(santa);
+
+        center =
+            new THREE.Vector3();
+
+        box.getCenter(center);
+
+
+        santa.position.x -= center.x;
+        santa.position.y -= center.y;
+        santa.position.z -= center.z;
+
+
+        // PUT SANTA IN FRONT OF CAMERA
+
+        santa.position.set(
+            0,
+            0,
+            0
+        );
+
+
+        // ROTATE TO FACE CAMERA
+
+        santa.rotation.y = Math.PI;
+
+
+        // FINAL BOX
+
+        box =
+            new THREE.Box3()
+                .setFromObject(santa);
+
+        console.log(
+            "FINAL BOX:",
+            box
+        );
+
+
+        // CAMERA
+
+        camera.position.set(
+            0,
+            1,
+            8
+        );
+
+        controls.target.set(
+            0,
+            0,
+            0
+        );
+
+        controls.update();
+
+
+        document.getElementById("info").innerHTML =
+            "🎅 Santa loaded! Meshes found: " +
+            meshCount;
+
+
+        console.log(
+            "🎅 SANTA DEBUG COMPLETE"
+        );
+
+    },
+
+    function(progress) {
+
+        if (progress.total) {
+
+            console.log(
+                "Loading:",
+                Math.round(
+                    progress.loaded /
+                    progress.total *
+                    100
+                ) + "%"
+            );
+
+        }
+
+    },
+
+    function(error) {
+
+        console.error(
+            "SANTA ERROR:",
+            error
+        );
+
+        document.getElementById("info").innerHTML =
+            "❌ Santa error — press F12 and open Console.";
+
+    }
+);
+
+
+// ANIMATION
+
+function animate() {
+
+    requestAnimationFrame(
+        animate
+    );
+
+    controls.update();
+
+    renderer.render(
+        scene,
+        camera
+    );
+
+}
+
+animate();
+
+
+// RESIZE
+
+window.addEventListener(
+    "resize",
+    function() {
+
+        camera.aspect =
+            window.innerWidth /
+            window.innerHeight;
+
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(
+            window.innerWidth,
+            window.innerHeight
+        );
+
+    }
+);
+
+</script>
+
+</body>
+</html>
